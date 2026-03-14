@@ -77,11 +77,9 @@ fi
 
 # Step 5: Build
 echo ""
-echo "🏗️  Step 5/5: Starting EAS build..."
-echo "   This will run in the cloud. You can Ctrl+C after it uploads."
+echo "🏗️  Step 5/5: Starting EAS build (non-interactive)..."
 echo ""
-npx eas build --platform ios --profile preview
-
+npx eas build --platform ios --profile preview --non-interactive
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "✅ Ship complete!"
