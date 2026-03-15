@@ -171,42 +171,117 @@ The app will hot-reload as you edit code.
 ### Prerequisites
 
 - **Apple Developer account** ($99/year) — required for any iOS deployment outside Expo Go.
-  Sign up at https://developer.apple.com
+  Sign up at https://developer.apple.com/programs/enroll/ (Individual enrollment).
+  After paying, it may take a few hours for App Store Connect access to activate.
 - **EAS CLI** — Expo's cloud build service
+- **Expo account** — free, sign up at https://expo.dev/signup
 
-### Install EAS CLI
+### First-time setup
 
 ```bash
+# Install EAS CLI globally
 npm install -g eas-cli
-npx eas login
-```
 
-### Configure builds
+# Log in to Expo (use browser auth if interactive login fails)
+npx eas login --browser
 
-```bash
+# Configure build profiles
 npx eas build:configure
 ```
 
-This creates an `eas.json` file with build profiles.
+### Register your devices
 
-### Build for TestFlight (personal testing)
+Each physical iOS device (iPhone, iPad) must be registered with EAS before it can install
+preview builds. The provisioning profile is baked into the build and only allows registered
+devices.
+
+#### Option A: Website registration
+
+```bash
+npx eas device:create
+```
+
+This generates a URL. Open it **in Safari** on each device you want to register. It installs
+a temporary profile that sends the device UDID to EAS.
+
+#### Option B: Manual registration (if the website hangs)
+
+Find your device UDID:
+- Go to https://udid.tech **in Safari** on the device
+- It will prompt you to download a profile — allow it
+- Go to **Settings → General → VPN & Device Management** and install the profile
+- Copy the UDID shown on the website
+
+Then register manually:
+
+```bash
+npx eas device:create --name "My iPhone" --udid YOUR_UDID_HERE
+```
+
+#### Verify registered devices
+
+```bash
+npx eas device:list
+```
+
+### Building and installing
+
+#### Ship script (recommended)
+
+The `ship` script type-checks, commits, pushes, and builds in one command:
+
+```bash
+npm run ship "feat(list): add new feature description"
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for commit message conventions.
+
+#### Manual build
 
 ```bash
 npx eas build --platform ios --profile preview
 ```
 
-EAS builds in the cloud — no Mac needed. The first time, it will walk you through linking your
-Apple Developer account and creating provisioning profiles.
+EAS builds in the cloud — no Mac needed. The first time, it will walk you through linking
+your Apple Developer account and creating provisioning profiles.
 
-### Install on your iPhone
+#### Installing on your device
 
-After the build completes, you have two options:
+After the build completes:
 
-1. **QR code** — EAS shows a QR code / download link. Scan it to install directly.
-2. **TestFlight** — Submit to App Store Connect and install via the TestFlight app:
-   ```bash
-   npx eas submit --platform ios
-   ```
+1. Go to **https://expo.dev** → your project → **Builds**
+2. Find the latest build and tap **Install** or scan the QR code
+3. Open the link **in Safari** on your device (Chrome won't work)
+4. When prompted, tap **Install**
+5. The app will appear on your home screen
+6. **First launch:** Go to **Settings → General → VPN & Device Management**, tap the
+   developer profile, and tap **Trust**
+7. **Developer Mode** must be enabled: **Settings → Privacy & Security → Developer Mode → On**
+   (requires restart)
+
+#### Troubleshooting installs
+
+| Issue | Fix |
+|-------|-----|
+| "Unable to Install — integrity could not be verified" | Your device UDID is not in the provisioning profile. Register the device and rebuild. |
+| Install page hangs | Make sure you're using **Safari**, not Chrome or another browser. |
+| App crashes on launch | Enable **Developer Mode** in Settings → Privacy & Security. |
+| New device not working after registration | The provisioning profile must be regenerated. Run `npx eas credentials --platform ios`, select Build credentials, re-select all devices, then rebuild. |
+
+#### Regenerating provisioning profiles
+
+If you add a new device after a build, the old build won't work on that device. You must
+regenerate the provisioning profile:
+
+```bash
+# Interactive: select Build credentials, then re-select ALL devices
+npx eas credentials --platform ios
+
+# Then rebuild
+npm run ship "chore: regenerate provisioning profile"
+```
+
+Make sure to **select all devices** (iPhone AND iPad) when prompted.
 
 ### Build for App Store (public release)
 
