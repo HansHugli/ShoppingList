@@ -26,6 +26,7 @@ interface ShoppingState {
 }
 
 let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let hasPendingLocalChanges = false;
 
 export const useShoppingStore = create<ShoppingState>((set, get) => ({
   items: [],
@@ -45,9 +46,20 @@ export const useShoppingStore = create<ShoppingState>((set, get) => ({
     try {
       const result = await syncService.fetch();
       if (result) {
-        set({ items: result.items, lastSyncedAt: new Date(), syncStatus: 'idle' });
+        if (hasPendingLocalChanges) {
+          // Merge remote into local — preserve new/modified local items
+          const localItems = get().items;
+          const merged = mergeRemoteIntoLocal(result.items, localItems);
+          set({ items: merged, lastSyncedAt: new Date(), syncStatus: 'idle' });
+        } else {
+          set({ items: result.items, lastSyncedAt: new Date(), syncStatus: 'idle' });
+        }
       } else {
-        set({ items: [], lastSyncedAt: new Date(), syncStatus: 'idle' });
+        if (!hasPendingLocalChanges) {
+          set({ items: [], lastSyncedAt: new Date(), syncStatus: 'idle' });
+        } else {
+          set({ lastSyncedAt: new Date(), syncStatus: 'idle' });
+        }
       }
     } catch {
       set({ syncStatus: 'error' });
@@ -126,8 +138,33 @@ export const useShoppingStore = create<ShoppingState>((set, get) => ({
 
 /** Debounce remote sync — batch rapid actions, flush after 2s idle */
 function debouncedSync(get: () => ShoppingState) {
+  hasPendingLocalChanges = true;
   if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
-  syncDebounceTimer = setTimeout(() => {
-    get().syncToRemote();
+  syncDebounceTimer = setTimeout(async () => {
+    await get().syncToRemote();
+    hasPendingLocalChanges = false;
   }, 2000);
+}
+
+/**
+ * Merge remote items into local state, preserving any local-only items
+ * (new items added while a sync was pending).
+ */
+function mergeRemoteIntoLocal(
+  remote: ShoppingItemData[],
+  local: ShoppingItemData[],
+): ShoppingItemData[] {
+  const merged = new Map<string, ShoppingItemData>();
+
+  // Start with remote items
+  for (const item of remote) {
+    merged.set(item.id, { ...item });
+  }
+
+  // Overlay local items — local wins for everything (new items + local edits)
+  for (const item of local) {
+    merged.set(item.id, { ...item });
+  }
+
+  return Array.from(merged.values());
 }
